@@ -1,63 +1,140 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  PermissionsAndroid,
+  Platform,
+  Alert,
+} from 'react-native';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+import * as ImagePicker from 'react-native-image-picker';
 
 export default function HomeScreen() {
+  const [imageUri, setImageUri] = useState<string | null>(null);
+
+  const requestCameraPermission = async () => {
+    if (Platform.OS !== 'android') {
+      return true;
+    }
+
+    const result = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.CAMERA,
+      {
+        title: 'Доступ до камери',
+        message:
+          'Застосунку потрібен доступ до камери, щоб зробити фотографію.',
+        buttonPositive: 'Дозволити',
+        buttonNegative: 'Відхилити',
+      }
+    );
+
+    return result === PermissionsAndroid.RESULTS.GRANTED;
+  };
+
+  const requestGalleryPermission = async () => {
+    if (Platform.OS !== 'android') {
+      return true;
+    }
+
+    const permission =
+      Platform.Version >= 33
+        ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
+        : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
+
+    const result = await PermissionsAndroid.request(
+      permission,
+      {
+        title: 'Доступ до галереї',
+        message:
+          'Застосунку потрібен доступ до фотографій.',
+        buttonPositive: 'Дозволити',
+        buttonNegative: 'Відхилити',
+      }
+    );
+
+    return result === PermissionsAndroid.RESULTS.GRANTED;
+  };
+
+  const openCamera = async () => {
+    const granted = await requestCameraPermission();
+
+    if (!granted) {
+      Alert.alert('Доступ до камери не надано');
+      return;
+    }
+
+    const result = await ImagePicker.launchCamera({
+      mediaType: 'photo',
+      saveToPhotos: true,
+      includeBase64: false,
+    });
+
+    if (
+      !result.didCancel &&
+      result.assets &&
+      result.assets.length > 0
+    ) {
+      setImageUri(result.assets[0].uri ?? null);
+    }
+  };
+
+  const openGallery = async () => {
+    const granted = await requestGalleryPermission();
+
+    if (!granted) {
+      Alert.alert('Доступ до галереї не надано');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibrary({
+      mediaType: 'photo',
+      selectionLimit: 1,
+      includeBase64: false,
+    });
+
+    if (
+      !result.didCancel &&
+      result.assets &&
+      result.assets.length > 0
+    ) {
+      setImageUri(result.assets[0].uri ?? null);
+    }
+  };
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+    <View style={styles.container}>
+      <Text style={styles.title}>
+        Камера та галерея
+      </Text>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={openCamera}
+      >
+        <Text style={styles.buttonText}>
+          Відкрити камеру
+        </Text>
+      </TouchableOpacity>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={openGallery}
+      >
+        <Text style={styles.buttonText}>
+          Відкрити галерею
+        </Text>
+      </TouchableOpacity>
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+      {imageUri && (
+        <Image
+          source={{ uri: imageUri }}
+          style={styles.image}
+        />
+      )}
+    </View>
   );
 }
 
@@ -65,34 +142,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
     alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+    padding: 20,
+    backgroundColor: '#ffffff',
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
+
   title: {
-    textAlign: 'center',
+    fontSize: 26,
+    fontWeight: '600',
+    marginBottom: 40,
   },
-  code: {
-    textTransform: 'uppercase',
+
+  button: {
+    width: '85%',
+    backgroundColor: '#222222',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+
+  buttonText: {
+    color: '#ffffff',
+    fontSize: 18,
+  },
+
+  image: {
+    width: 250,
+    height: 250,
+    marginTop: 20,
+    borderRadius: 12,
   },
 });
